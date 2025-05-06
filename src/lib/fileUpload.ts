@@ -49,8 +49,7 @@ export class FileUploadService {
       // Create a local preview URL for immediate display
       const localPreviewUrl = await createLocalPreview(file);
 
-      // If Cloudinary is configured, upload to cloud storage
-      if (isCloudinaryConfigured) {
+      try {
         console.log('Uploading to Cloudinary...');
 
         // Determine the folder based on file type
@@ -68,9 +67,12 @@ export class FileUploadService {
           size: file.size,
           name: file.name
         };
-      } else {
-        // Fallback to data URL for development/demo
-        console.log('Cloudinary upload failed, using data URL instead');
+      } catch (cloudinaryError) {
+        // Log the detailed error
+        console.error('Cloudinary upload failed:', cloudinaryError);
+
+        // Fallback to data URL
+        console.log('Falling back to data URL instead');
 
         return {
           publicUrl: localPreviewUrl, // Use the data URL as the public URL

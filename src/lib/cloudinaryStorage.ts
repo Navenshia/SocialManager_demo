@@ -1,18 +1,19 @@
 import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Service for interacting with Cloudinary
  */
 export class CloudinaryService {
   private cloudName: string;
-  private uploadPreset: string;
   private apiKey: string;
+  private apiSecret: string;
 
   constructor() {
-    // Use environment variables for these values
+    // Use environment variables for these values or hardcoded values as fallback
     this.cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dof22i7vm';
-    this.uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'social_manager_preset';
     this.apiKey = import.meta.env.VITE_CLOUDINARY_API_KEY || '245952711691622';
+    this.apiSecret = import.meta.env.VITE_CLOUDINARY_API_SECRET || 'DFrO4Cr3MU4SW9EQZqk2VzNrWrQ';
 
     console.log('Cloudinary initialized with cloud name:', this.cloudName);
 
@@ -33,12 +34,38 @@ export class CloudinaryService {
       const formData = new FormData();
       formData.append('file', file);
 
-      // If we have an upload preset, use it (for unsigned uploads)
-      if (this.uploadPreset) {
-        formData.append('upload_preset', this.uploadPreset);
-      }
+      // Add authentication parameters
+      formData.append('api_key', this.apiKey);
 
-      formData.append('folder', folder);
+      // Add a timestamp
+      const timestamp = Math.round(new Date().getTime() / 1000);
+      formData.append('timestamp', timestamp.toString());
+
+      // Add a unique public_id to prevent collisions
+      const publicId = `${folder}/${uuidv4()}`;
+      formData.append('public_id', publicId);
+
+      // Generate a signature
+      // In a production app, this should be done server-side
+      // For demo purposes, we're doing it client-side
+      const signatureParams = {
+        public_id: publicId,
+        timestamp: timestamp.toString(),
+      };
+
+      // Create signature string
+      const signatureStr = Object.entries(signatureParams)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}=${value}`)
+        .join('&') + this.apiSecret;
+
+      // Generate SHA-1 hash for signature
+      // Since we can't use crypto directly in the browser, we'll use a simple approach
+      // This is NOT secure for production, but works for demo purposes
+      const signature = await this.generateSignature(signatureStr);
+      formData.append('signature', signature);
+
+      console.log('Uploading to Cloudinary with direct upload...');
 
       // Upload to Cloudinary using the upload API
       const response = await axios.post(
@@ -55,6 +82,21 @@ export class CloudinaryService {
       console.error('Error uploading file to Cloudinary:', error);
       throw new Error('Failed to upload file to Cloudinary');
     }
+  }
+
+  /**
+   * Generate a signature for Cloudinary upload
+   * In a production app, this should be done server-side
+   * @param string The string to hash
+   * @returns The SHA-1 hash
+   */
+  private async generateSignature(string: string): Promise<string> {
+    // Use the Web Crypto API to generate a SHA-1 hash
+    const msgUint8 = new TextEncoder().encode(string);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
   }
 
   /**

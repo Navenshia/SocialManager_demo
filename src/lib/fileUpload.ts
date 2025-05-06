@@ -1,9 +1,9 @@
 /**
  * FileUploadService
  *
- * This service handles file uploads and provides public URLs for media files.
+ * This service handles file uploads and provides URLs for media files.
  * In a production environment, this would upload to cloud storage like S3, Firebase, etc.
- * For this implementation, we'll simulate file uploads by creating data URLs.
+ * For this implementation, we'll use data URLs directly.
  */
 
 // Maximum file size in bytes (5MB)
@@ -19,11 +19,11 @@ export interface UploadResult {
 
 export class FileUploadService {
   /**
-   * Upload a file and get a public URL
+   * Upload a file and get a URL
    * Note: In a real implementation, this would upload to a cloud storage service
    * and return the URL of the uploaded file.
    *
-   * For this demo, we'll convert the file to a data URL instead.
+   * For this demo, we'll use the data URL directly.
    */
   static async uploadFile(file: File): Promise<UploadResult> {
     // Validate file size
@@ -43,7 +43,7 @@ export class FileUploadService {
     }
 
     // In a real implementation, upload to cloud storage and get URL
-    // For this example, we'll create a data URL and use a proxy service
+    // For this example, we'll use the data URL directly
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
@@ -52,65 +52,25 @@ export class FileUploadService {
           try {
             console.log(`File read as data URL, size: ${reader.result.length} characters`);
 
-            // For Instagram API, we need to provide a publicly accessible URL
-            // We'll use ImgBB's API to upload the image and get a public URL
-
-            // First, get the base64 data without the prefix
-            const base64Data = reader.result.split(',')[1];
+            // Use the data URL for both preview and API
+            const dataUrl = reader.result;
 
             if (fileType === 'image') {
-              console.log("Using a reliable public image URL for Instagram API...");
-
-              // Since we're having issues with image upload services in this demo,
-              // we'll use a reliable public image URL based on the file type
-
-              // Determine a good placeholder based on the file's mime type
-              let publicUrl: string;
-
-              if (file.type.includes('jpeg') || file.type.includes('jpg')) {
-                publicUrl = 'https://images.pexels.com/photos/1170986/pexels-photo-1170986.jpeg';
-              } else if (file.type.includes('png')) {
-                publicUrl = 'https://images.pexels.com/photos/1170986/pexels-photo-1170986.jpeg';
-              } else if (file.type.includes('gif')) {
-                publicUrl = 'https://images.pexels.com/photos/1170986/pexels-photo-1170986.jpeg';
-              } else {
-                // Default image
-                publicUrl = 'https://images.pexels.com/photos/1170986/pexels-photo-1170986.jpeg';
-              }
-
-              console.log(`Using reliable public image URL: ${publicUrl}`);
-
-              // Create a local preview URL for the UI
-              const localPreviewUrl = reader.result;
+              console.log("Using uploaded image data URL");
 
               resolve({
-                publicUrl, // The public URL for Instagram API
-                localPreviewUrl, // The local preview URL for the UI
+                publicUrl: dataUrl, // Use the data URL directly for the API
+                localPreviewUrl: dataUrl, // Same URL for preview
                 fileType,
                 size: file.size,
                 name: file.name
               });
             } else if (fileType === 'video') {
-              // For videos, we'll use a placeholder for now as video upload is more complex
-              console.log("Video uploads require a more complex solution. Using a placeholder for demo purposes.");
-
-              const placeholderVideos = [
-                'https://assets.mixkit.co/videos/preview/mixkit-tree-with-yellow-flowers-1173-large.mp4',
-                'https://assets.mixkit.co/videos/preview/mixkit-waves-in-the-water-1164-large.mp4',
-                'https://assets.mixkit.co/videos/preview/mixkit-forest-stream-in-the-sunlight-529-large.mp4'
-              ];
-
-              const randomIndex = Math.floor(Math.random() * placeholderVideos.length);
-              const publicUrl = placeholderVideos[randomIndex];
-
-              console.log(`Using placeholder video URL for Instagram API: ${publicUrl}`);
-
-              // Create a local preview URL for the UI
-              const localPreviewUrl = reader.result;
+              console.log("Using uploaded video data URL");
 
               resolve({
-                publicUrl,
-                localPreviewUrl, // The local preview URL for the UI
+                publicUrl: dataUrl, // Use the data URL directly for the API
+                localPreviewUrl: dataUrl, // Same URL for preview
                 fileType,
                 size: file.size,
                 name: file.name

@@ -358,9 +358,9 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
         if (usePublicUrl) {
           alert("Post published successfully to Instagram with your caption and the provided public image URL! Check your Instagram account to see the post.");
         } else if (mediaFile && mediaType === 'image') {
-          alert("Post published successfully to Instagram with your caption and a reliable Pexels image! Check your Instagram account to see the post.");
+          alert("Post published successfully to Instagram with your caption and your uploaded image! Check your Instagram account to see the post.");
         } else if (mediaFile && mediaType === 'video') {
-          alert("Post published successfully to Instagram with your caption and a placeholder video! Check your Instagram account to see the post.");
+          alert("Post published successfully to Instagram with your caption and your uploaded video! Check your Instagram account to see the post.");
         } else {
           alert("Post published successfully to Instagram! Check your Instagram account to see the post.");
         }
@@ -500,14 +500,14 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
                   setMediaUrl(undefined);
                 }
               }}
-              placeholder="https://images.pexels.com/photos/your-image.jpg"
+              placeholder="https://example.com/your-image.jpg"
               className="w-full"
             />
             <p className="text-sm text-green-600 dark:text-green-400">
-              Enter a publicly accessible URL from Pexels, Unsplash, or any other image hosting service.
+              Enter a publicly accessible URL for your image or video.
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Example: https://images.pexels.com/photos/247851/pexels-photo-247851.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1
+              Example: https://example.com/your-image.jpg
             </p>
 
             {publicMediaUrl && (
@@ -586,9 +586,8 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
             {mediaFile && (
               <div className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-3 rounded-md">
                 <p className="font-medium">Media Processing:</p>
-                <p>Your image will be shown in the preview, but we'll use a reliable Pexels image for posting to Instagram.</p>
-                <p className="mt-1">This happens automatically when you click "Post Now".</p>
-                <p className="mt-1 font-medium">Note: In a production app, your actual image would be uploaded to cloud storage and used for the post.</p>
+                <p>Your image will be used for posting to social media platforms.</p>
+                <p className="mt-1">Click "Post Now" to publish your content with this image.</p>
               </div>
             )}
           </div>

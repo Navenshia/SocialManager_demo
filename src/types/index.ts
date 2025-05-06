@@ -5,7 +5,7 @@ export type Platform = 'instagram' | 'youtube' | 'tiktok';
 export interface Post {
   id: string;
   content: string; // Caption/text content
-  mediaUrl?: string; // URL to image or video 
+  mediaUrl?: string; // URL to image or video
   mediaType?: 'image' | 'video';
   platforms: Platform[];
   scheduledFor: Date | null; // null means publish immediately
@@ -22,6 +22,7 @@ export interface Comment {
   platform: Platform;
   postId: string;
   platformPostId: string;
+  platformCommentId?: string; // The original comment ID from the platform
   content: string;
   author: {
     id: string;

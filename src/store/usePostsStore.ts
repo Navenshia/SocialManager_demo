@@ -8,7 +8,7 @@ interface PostsState {
   scheduled: Post[];
   published: Post[];
   failed: Post[];
-  
+
   // Actions
   createPost: (content: string, mediaUrl?: string, mediaType?: 'image' | 'video', platforms?: Platform[]) => Post;
   updatePost: (id: string, data: Partial<Post>) => void;
@@ -25,7 +25,7 @@ const usePostsStore = create<PostsState>((set, get) => ({
   scheduled: [],
   published: [],
   failed: [],
-  
+
   createPost: (content, mediaUrl, mediaType, platforms = ['instagram', 'youtube', 'tiktok']) => {
     const now = new Date();
     const newPost: Post = {
@@ -39,32 +39,32 @@ const usePostsStore = create<PostsState>((set, get) => ({
       createdAt: now,
       updatedAt: now,
     };
-    
+
     set(state => {
       const updatedPosts = [...state.posts, newPost];
       const updatedDrafts = [...state.drafts, newPost];
-      
+
       return {
         posts: updatedPosts,
         drafts: updatedDrafts,
       };
     });
-    
+
     return newPost;
   },
-  
+
   updatePost: (id, data) => {
     set(state => {
-      const updatedPosts = state.posts.map(post => 
+      const updatedPosts = state.posts.map(post =>
         post.id === id ? { ...post, ...data, updatedAt: new Date() } : post
       );
-      
+
       // Update categorized lists
       const updatedDrafts = updatedPosts.filter(post => post.status === 'draft');
       const updatedScheduled = updatedPosts.filter(post => post.status === 'scheduled');
       const updatedPublished = updatedPosts.filter(post => post.status === 'published');
       const updatedFailed = updatedPosts.filter(post => post.status === 'failed');
-      
+
       return {
         posts: updatedPosts,
         drafts: updatedDrafts,
@@ -74,17 +74,17 @@ const usePostsStore = create<PostsState>((set, get) => ({
       };
     });
   },
-  
+
   deletePost: (id) => {
     set(state => {
       const filteredPosts = state.posts.filter(post => post.id !== id);
-      
+
       // Update categorized lists
       const filteredDrafts = filteredPosts.filter(post => post.status === 'draft');
       const filteredScheduled = filteredPosts.filter(post => post.status === 'scheduled');
       const filteredPublished = filteredPosts.filter(post => post.status === 'published');
       const filteredFailed = filteredPosts.filter(post => post.status === 'failed');
-      
+
       return {
         posts: filteredPosts,
         drafts: filteredDrafts,
@@ -94,51 +94,77 @@ const usePostsStore = create<PostsState>((set, get) => ({
       };
     });
   },
-  
+
   schedulePost: (id, scheduleDate) => {
-    get().updatePost(id, { 
+    get().updatePost(id, {
       scheduledFor: scheduleDate,
       status: 'scheduled',
     });
   },
-  
+
   publishPost: (id, platformPostIds) => {
+    // First, check if we already have a post with any of these platform IDs
+    const { posts } = get();
+    const duplicates = new Set();
+
+    // Check each platform
+    Object.entries(platformPostIds).forEach(([platform, platformId]) => {
+      if (platformId) {
+        // Find any existing posts with this platform ID
+        const existingPosts = posts.filter(
+          p => p.platformPostIds?.[platform as Platform] === platformId && p.id !== id
+        );
+
+        // If we found duplicates, mark them for deletion
+        existingPosts.forEach(p => duplicates.add(p.id));
+      }
+    });
+
+    // Delete any duplicates we found
+    if (duplicates.size > 0) {
+      console.log(`Found ${duplicates.size} duplicate posts. Removing them.`);
+      duplicates.forEach(duplicateId => {
+        get().deletePost(duplicateId as string);
+      });
+    }
+
+    // Now update the post
     get().updatePost(id, {
       publishedAt: new Date(),
       status: 'published',
       platformPostIds,
     });
   },
-  
+
   markAsFailed: (id, error) => {
     get().updatePost(id, {
       status: 'failed',
     });
   },
-  
+
   filterPosts: (status, platform, startDate, endDate) => {
     const { posts } = get();
-    
+
     return posts.filter(post => {
       // Filter by status
       if (status && post.status !== status) {
         return false;
       }
-      
+
       // Filter by platform
       if (platform && !post.platforms.includes(platform)) {
         return false;
       }
-      
+
       // Filter by date range
       if (startDate && post.createdAt < startDate) {
         return false;
       }
-      
+
       if (endDate && post.createdAt > endDate) {
         return false;
       }
-      
+
       return true;
     });
   },

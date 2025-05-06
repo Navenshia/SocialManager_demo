@@ -15,8 +15,8 @@ export default abstract class BaseApiService {
     // Add request logging
     this.client.interceptors.request.use(
       (config) => {
-        console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, 
-          sanitizeForLogging(config.params || {}), 
+        console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`,
+          sanitizeForLogging(config.params || {}),
           sanitizeForLogging(config.data || {})
         );
         return config;
@@ -65,15 +65,40 @@ export default abstract class BaseApiService {
   protected handleApiError(error: any): never {
     if (error.response) {
       // Server responded with a status code outside of 2xx range
-      const message = error.response.data?.message || error.response.statusText;
       const status = error.response.status;
-      throw new Error(`API Error (${status}): ${message}`);
+
+      // Try to extract the most useful error message
+      let message = '';
+      if (error.response.data?.error?.message) {
+        message = error.response.data.error.message;
+      } else if (error.response.data?.message) {
+        message = error.response.data.message;
+      } else if (error.response.data?.error_message) {
+        message = error.response.data.error_message;
+      } else if (typeof error.response.data === 'string') {
+        message = error.response.data;
+      } else {
+        message = error.response.statusText || 'Unknown error';
+      }
+
+      // Handle specific status codes
+      if (status === 401 || status === 403) {
+        throw new Error(`Authentication error (${status}): ${message}. Your access token may be invalid or expired.`);
+      } else if (status === 404) {
+        throw new Error(`Resource not found (${status}): ${message}`);
+      } else if (status === 400) {
+        throw new Error(`Bad request (${status}): ${message}`);
+      } else if (status >= 500) {
+        throw new Error(`Server error (${status}): ${message}. Please try again later.`);
+      } else {
+        throw new Error(`API Error (${status}): ${message}`);
+      }
     } else if (error.request) {
       // Request was made but no response was received
-      throw new Error('API Error: No response received from server');
+      throw new Error('Network error: No response received from server. Please check your internet connection.');
     } else {
       // Something else happened while setting up the request
-      throw new Error(`API Error: ${error.message}`);
+      throw new Error(`API Error: ${error.message || 'Unknown error occurred'}`);
     }
   }
 }

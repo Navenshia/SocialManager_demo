@@ -1,22 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart3, Calendar, Plus, RefreshCw } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import usePostsStore from '../store/usePostsStore';
 import useSettingsStore from '../store/useSettingsStore';
-import { Platform, PlatformStats, Post } from '../types';
+import { Platform } from '../types';
 import { socialMediaCoordinator } from '../api';
 import { format } from 'date-fns';
 
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'scheduled' | 'recent'>('overview');
-  
+
   const { posts, drafts, scheduled, published } = usePostsStore();
   const { platformsEnabled, platformStats } = useSettingsStore();
-  
-  const fetchStats = async () => {
+
+  const fetchStats = useCallback(async () => {
     setIsLoading(true);
     try {
       await socialMediaCoordinator.getPlatformStats();
@@ -25,32 +25,90 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-  
+  }, []);
+
+  // Track if we've already deduped posts
+  const [postsDeduped, setPostsDeduped] = useState(false);
+
+  // Function to deduplicate posts
+  const deduplicatePosts = useCallback(() => {
+    console.log("Checking for duplicate posts...");
+
+    // Get the posts store
+    const postsStore = usePostsStore.getState();
+
+    // Get unique post IDs by platform post ID
+    const uniquePostIds = new Map<string, string>();
+    const duplicates: string[] = [];
+
+    // First pass: collect unique posts by their Instagram post ID
+    posts.forEach(post => {
+      if (post.platformPostIds?.instagram) {
+        // If we haven't seen this Instagram post ID before, add it
+        if (!uniquePostIds.has(post.platformPostIds.instagram)) {
+          uniquePostIds.set(post.platformPostIds.instagram, post.id);
+        } else {
+          // This is a duplicate
+          duplicates.push(post.id);
+        }
+      }
+    });
+
+    // If we found duplicates, remove them
+    if (duplicates.length > 0) {
+      console.log(`Found ${duplicates.length} duplicate posts. Removing...`);
+
+      // Delete all duplicate posts
+      for (const postId of duplicates) {
+        postsStore.deletePost(postId);
+      }
+
+      console.log("Duplicate posts removed.");
+      return true;
+    } else {
+      console.log("No duplicate posts found.");
+      return false;
+    }
+  }, [posts]);
+
   useEffect(() => {
     // Fetch stats on initial load
     fetchStats();
+
+    // Deduplicate posts if we haven't already
+    if (!postsDeduped) {
+      const duplicatesRemoved = deduplicatePosts();
+      setPostsDeduped(true);
+
+      // If duplicates were removed, refresh stats
+      if (duplicatesRemoved) {
+        setTimeout(() => {
+          fetchStats();
+        }, 500);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   // Get platforms that are enabled
   const enabledPlatforms = Object.entries(platformsEnabled)
     .filter(([_, enabled]) => enabled)
     .map(([platform]) => platform as Platform);
-  
+
   // Get next scheduled post
   const nextScheduledPost = scheduled.length > 0
-    ? [...scheduled].sort((a, b) => 
-        a.scheduledFor && b.scheduledFor 
+    ? [...scheduled].sort((a, b) =>
+        a.scheduledFor && b.scheduledFor
           ? new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime()
           : 0
       )[0]
     : null;
-  
+
   // Get recent activity
   const recentPosts = [...posts]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
-  
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -60,10 +118,10 @@ const Dashboard: React.FC = () => {
             {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        
+
         <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />}
             onClick={fetchStats}
@@ -71,8 +129,48 @@ const Dashboard: React.FC = () => {
           >
             Refresh
           </Button>
-          
-          <Button 
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (window.confirm('This will reset all posts to fix any duplicates. Continue?')) {
+                // Get the posts store
+                const postsStore = usePostsStore.getState();
+
+                // Get unique post IDs by platform post ID
+                const uniquePostIds = new Map();
+
+                // First pass: collect unique posts by their Instagram post ID
+                posts.forEach(post => {
+                  if (post.platformPostIds?.instagram) {
+                    // If we haven't seen this Instagram post ID before, add it
+                    if (!uniquePostIds.has(post.platformPostIds.instagram)) {
+                      uniquePostIds.set(post.platformPostIds.instagram, post.id);
+                    }
+                  }
+                });
+
+                // Second pass: delete all posts except the unique ones
+                posts.forEach(post => {
+                  if (post.platformPostIds?.instagram) {
+                    // If this post's ID is not the one we want to keep for this Instagram post ID, delete it
+                    if (uniquePostIds.get(post.platformPostIds.instagram) !== post.id) {
+                      postsStore.deletePost(post.id);
+                    }
+                  } else {
+                    // If the post doesn't have an Instagram post ID, keep it
+                  }
+                });
+
+                alert('Posts have been deduplicated. Refresh the page to see the changes.');
+              }
+            }}
+          >
+            Fix Duplicates
+          </Button>
+
+          <Button
             size="sm"
             icon={<Plus size={16} />}
             onClick={() => {}}
@@ -81,7 +179,7 @@ const Dashboard: React.FC = () => {
           </Button>
         </div>
       </div>
-      
+
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800">
@@ -97,7 +195,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </Card>
-        
+
         <Card className="bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-800">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-green-100 dark:bg-green-800/50 text-green-600 dark:text-green-400 mr-4">
@@ -111,7 +209,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </Card>
-        
+
         <Card>
           <div className="flex items-center">
             <div className="flex-shrink-0 mr-4">
@@ -127,7 +225,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </Card>
-        
+
         <Card>
           <div className="flex items-center">
             <div className="flex-shrink-0 mr-4">
@@ -144,12 +242,12 @@ const Dashboard: React.FC = () => {
           </div>
         </Card>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Platform activity */}
         <div className="lg:col-span-2">
-          <Card 
-            title="Platform Activity" 
+          <Card
+            title="Platform Activity"
             className="h-full flex flex-col"
           >
             {/* Tabs */}
@@ -157,7 +255,7 @@ const Dashboard: React.FC = () => {
               <button
                 className={`pb-2 px-4 text-sm font-medium ${
                   activeTab === 'overview'
-                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' 
+                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
                 onClick={() => setActiveTab('overview')}
@@ -167,7 +265,7 @@ const Dashboard: React.FC = () => {
               <button
                 className={`pb-2 px-4 text-sm font-medium ${
                   activeTab === 'scheduled'
-                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' 
+                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
                 onClick={() => setActiveTab('scheduled')}
@@ -177,7 +275,7 @@ const Dashboard: React.FC = () => {
               <button
                 className={`pb-2 px-4 text-sm font-medium ${
                   activeTab === 'recent'
-                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' 
+                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
                 onClick={() => setActiveTab('recent')}
@@ -185,7 +283,7 @@ const Dashboard: React.FC = () => {
                 Recent Posts
               </button>
             </div>
-            
+
             {/* Tab content */}
             {activeTab === 'overview' && (
               <div>
@@ -201,7 +299,7 @@ const Dashboard: React.FC = () => {
                               Active
                             </span>
                           </div>
-                          
+
                           <div className="grid grid-cols-3 gap-2 mb-3 text-sm">
                             <div>
                               <span className="block text-gray-500 dark:text-gray-400">Posts</span>
@@ -216,7 +314,7 @@ const Dashboard: React.FC = () => {
                               <span className="font-semibold">{stats?.engagementRate ? `${(stats.engagementRate * 100).toFixed(1)}%` : '0%'}</span>
                             </div>
                           </div>
-                          
+
                           {stats?.recentActivity && stats.recentActivity.length > 0 && (
                             <div className="text-xs text-gray-600 dark:text-gray-400">
                               Latest: {stats.recentActivity[0].content.substring(0, 30)}{stats.recentActivity[0].content.length > 30 ? '...' : ''}
@@ -236,7 +334,7 @@ const Dashboard: React.FC = () => {
                 )}
               </div>
             )}
-            
+
             {activeTab === 'scheduled' && (
               <div>
                 {scheduled.length > 0 ? (
@@ -283,7 +381,7 @@ const Dashboard: React.FC = () => {
                 )}
               </div>
             )}
-            
+
             {activeTab === 'recent' && (
               <div>
                 {recentPosts.length > 0 ? (
@@ -344,7 +442,7 @@ const Dashboard: React.FC = () => {
             )}
           </Card>
         </div>
-        
+
         {/* Next scheduled & drafts */}
         <div className="space-y-6">
           <Card title="Next Scheduled Post">
@@ -367,8 +465,8 @@ const Dashboard: React.FC = () => {
                   ))}
                 </div>
                 <div className="mt-4">
-                  <Link 
-                    to="/scheduler" 
+                  <Link
+                    to="/scheduler"
                     className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     View all scheduled posts
@@ -384,12 +482,12 @@ const Dashboard: React.FC = () => {
               </div>
             )}
           </Card>
-          
+
           <Card title="Drafts">
             {drafts.length > 0 ? (
               <div className="space-y-3">
                 {drafts.slice(0, 3).map((draft) => (
-                  <div 
+                  <div
                     key={draft.id}
                     className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >

@@ -8,7 +8,11 @@ const ENCRYPTION_KEY = 'social-media-automation-tool-secret-key';
  * Encrypts sensitive data before storing it
  */
 export function encryptData(data: string): string {
-  return CryptoJS.AES.encrypt(data, ENCRYPTION_KEY).toString();
+  try {
+    return CryptoJS.AES.encrypt(data, ENCRYPTION_KEY).toString();
+  } catch (error) {
+    throw new Error('Encryption failed');
+  }
 }
 
 /**

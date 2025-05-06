@@ -7,18 +7,21 @@ interface SettingsState {
   apiCredentials: ApiCredentials;
   platformsEnabled: Record<Platform, boolean>;
   platformStats: Record<Platform, PlatformStats | null>;
-  
+
   // API Credentials actions
   setInstagramCredentials: (accessToken: string) => void;
   setYoutubeCredentials: (apiKey: string, clientId: string, clientSecret: string, redirectUri: string, refreshToken?: string) => void;
   setTiktokCredentials: (baseUrl: string, accessToken: string) => void;
   clearCredentials: (platform: Platform) => void;
-  
+
   // Platform toggle actions
   togglePlatform: (platform: Platform, enabled: boolean) => void;
-  
+
   // Stats actions
   updatePlatformStats: (platform: Platform, stats: PlatformStats) => void;
+
+  // Reset the entire store
+  resetStore: () => void;
 }
 
 const useSettingsStore = create<SettingsState>()(
@@ -35,7 +38,7 @@ const useSettingsStore = create<SettingsState>()(
         youtube: null,
         tiktok: null,
       },
-      
+
       setInstagramCredentials: (accessToken) => {
         const encryptedToken = encryptData(accessToken);
         set((state) => ({
@@ -51,13 +54,13 @@ const useSettingsStore = create<SettingsState>()(
           },
         }));
       },
-      
+
       setYoutubeCredentials: (apiKey, clientId, clientSecret, redirectUri, refreshToken) => {
         const encryptedApiKey = encryptData(apiKey);
         const encryptedClientId = encryptData(clientId);
         const encryptedClientSecret = encryptData(clientSecret);
         const encryptedRefreshToken = refreshToken ? encryptData(refreshToken) : undefined;
-        
+
         set((state) => ({
           apiCredentials: {
             ...state.apiCredentials,
@@ -75,10 +78,10 @@ const useSettingsStore = create<SettingsState>()(
           },
         }));
       },
-      
+
       setTiktokCredentials: (baseUrl, accessToken) => {
         const encryptedToken = encryptData(accessToken);
-        
+
         set((state) => ({
           apiCredentials: {
             ...state.apiCredentials,
@@ -93,12 +96,12 @@ const useSettingsStore = create<SettingsState>()(
           },
         }));
       },
-      
+
       clearCredentials: (platform) => {
         set((state) => {
           const newCredentials = { ...state.apiCredentials };
           delete newCredentials[platform];
-          
+
           return {
             apiCredentials: newCredentials,
             platformsEnabled: {
@@ -108,7 +111,7 @@ const useSettingsStore = create<SettingsState>()(
           };
         });
       },
-      
+
       togglePlatform: (platform, enabled) => {
         set((state) => ({
           platformsEnabled: {
@@ -117,7 +120,7 @@ const useSettingsStore = create<SettingsState>()(
           },
         }));
       },
-      
+
       updatePlatformStats: (platform, stats) => {
         set((state) => ({
           platformStats: {
@@ -125,6 +128,22 @@ const useSettingsStore = create<SettingsState>()(
             [platform]: stats,
           },
         }));
+      },
+
+      resetStore: () => {
+        set({
+          apiCredentials: {},
+          platformsEnabled: {
+            instagram: false,
+            youtube: false,
+            tiktok: false,
+          },
+          platformStats: {
+            instagram: null,
+            youtube: null,
+            tiktok: null,
+          },
+        });
       },
     }),
     {

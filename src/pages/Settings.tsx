@@ -65,8 +65,9 @@ const Settings: React.FC = () => {
       // Show success message
       setSuccessMessages(prev => ({ ...prev, instagram: 'Instagram credentials saved successfully' }));
       setInstagramToken('');
-    } catch (error) {
-      setErrors(prev => ({ ...prev, instagram: 'Failed to save Instagram credentials' }));
+    } catch (error: any) {
+      console.error('Error saving Instagram credentials:', error);
+      setErrors(prev => ({ ...prev, instagram: 'Failed to save Instagram credentials. Please check your access token and try again.' }));
     } finally {
       setSavingPlatform(null);
     }
@@ -238,7 +239,7 @@ const Settings: React.FC = () => {
                 type="submit"
                 disabled={savingPlatform === 'instagram'}
               >
-                {savingPlatform === 'instagram' ? 'Saving...' : 'Save Credentials'}
+                {savingPlatform === 'instagram' ? (savingPlatform === 'instagram' ? 'Saving...' : 'Save Credentials') : 'Save Credentials'}
               </Button>
             </form>
           )}

@@ -10,8 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cloudinary/url-gen": "^1.21.0",
+    "@google-cloud/storage": "^7.7.0",
     "@types/crypto-js": "^4.2.2",
     "axios": "^1.6.7",
+    "cloudinary-react": "^1.8.1",
     "crypto-js": "^4.2.0",
     "date-fns": "^3.3.1",
     "framer-motion": "^11.0.5",

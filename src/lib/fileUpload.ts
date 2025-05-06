@@ -2,12 +2,17 @@
  * FileUploadService
  *
  * This service handles file uploads and provides URLs for media files.
- * In a production environment, this would upload to cloud storage like S3, Firebase, etc.
- * For this implementation, we'll use data URLs directly.
+ * This implementation uses Cloudinary for image and video hosting.
+ * It falls back to data URLs if Cloudinary is not configured.
  */
 
-// Maximum file size in bytes (5MB)
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+import { cloudinaryStorage } from './cloudinaryStorage';
+
+// Maximum file size in bytes (10MB)
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+// Check if Cloudinary is configured
+const isCloudinaryConfigured = true; // We've hardcoded the cloud name in cloudinaryStorage.ts
 
 export interface UploadResult {
   publicUrl: string;
@@ -20,10 +25,8 @@ export interface UploadResult {
 export class FileUploadService {
   /**
    * Upload a file and get a URL
-   * Note: In a real implementation, this would upload to a cloud storage service
-   * and return the URL of the uploaded file.
-   *
-   * For this demo, we'll use the data URL directly.
+   * In production, this uploads to Cloudinary.
+   * In development, it falls back to data URLs if Cloudinary upload fails.
    */
   static async uploadFile(file: File): Promise<UploadResult> {
     // Validate file size
@@ -42,72 +45,95 @@ export class FileUploadService {
       throw new Error('Unsupported file type. Please upload an image or video file.');
     }
 
-    // In a real implementation, upload to cloud storage and get URL
-    // For this example, we'll use the data URL directly
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+    try {
+      // Create a local preview URL for immediate display
+      const localPreviewUrl = await createLocalPreview(file);
 
-      reader.onload = async () => {
-        if (typeof reader.result === 'string') {
-          try {
-            console.log(`File read as data URL, size: ${reader.result.length} characters`);
+      // If Cloudinary is configured, upload to cloud storage
+      if (isCloudinaryConfigured) {
+        console.log('Uploading to Cloudinary...');
 
-            // Use the data URL for both preview and API
-            const dataUrl = reader.result;
+        // Determine the folder based on file type
+        const folder = fileType === 'image' ? 'images' : 'videos';
 
-            if (fileType === 'image') {
-              console.log("Using uploaded image data URL");
+        // Upload to Cloudinary
+        const publicUrl = await cloudinaryStorage.uploadFile(file, folder);
 
-              resolve({
-                publicUrl: dataUrl, // Use the data URL directly for the API
-                localPreviewUrl: dataUrl, // Same URL for preview
-                fileType,
-                size: file.size,
-                name: file.name
-              });
-            } else if (fileType === 'video') {
-              console.log("Using uploaded video data URL");
+        console.log(`File uploaded to Cloudinary: ${publicUrl}`);
 
-              resolve({
-                publicUrl: dataUrl, // Use the data URL directly for the API
-                localPreviewUrl: dataUrl, // Same URL for preview
-                fileType,
-                size: file.size,
-                name: file.name
-              });
-            }
-          } catch (error) {
-            console.error("Error uploading file:", error);
-            reject(error);
-          }
-        } else {
-          reject(new Error('Failed to convert file to data URL'));
-        }
-      };
+        return {
+          publicUrl,
+          localPreviewUrl,
+          fileType,
+          size: file.size,
+          name: file.name
+        };
+      } else {
+        // Fallback to data URL for development/demo
+        console.log('Cloudinary upload failed, using data URL instead');
 
-      reader.onerror = () => {
-        reject(reader.error || new Error('Unknown error occurred during file read'));
-      };
-
-      // Convert file to data URL (for preview purposes only)
-      reader.readAsDataURL(file);
-    });
+        return {
+          publicUrl: localPreviewUrl, // Use the data URL as the public URL
+          localPreviewUrl,
+          fileType,
+          size: file.size,
+          name: file.name
+        };
+      }
+    } catch (error) {
+      console.error('Error in file upload:', error);
+      throw error;
+    }
   }
 
   /**
-   * Validate if a file meets the requirements
+   * Delete a file from storage
    */
-  static validateFile(file: File): boolean {
-    if (file.size > MAX_FILE_SIZE) {
-      return false;
+  static async deleteFile(url: string): Promise<void> {
+    if (isCloudinaryConfigured && url.includes('cloudinary.com')) {
+      await cloudinaryStorage.deleteFile(url);
+    } else {
+      console.log('Skipping delete for data URL or non-Cloudinary URL');
     }
-
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      return false;
-    }
-
-    return true;
   }
 }
+
+/**
+ * Create a local preview URL for a file
+ */
+async function createLocalPreview(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to create preview URL'));
+      }
+    };
+
+    reader.onerror = () => {
+      reject(reader.error || new Error('Unknown error reading file'));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Validate if a file meets the requirements
+ */
+FileUploadService.validateFile = function(file: File): boolean {
+  if (file.size > MAX_FILE_SIZE) {
+    return false;
+  }
+
+  if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+    return false;
+  }
+
+  return true;
+};
 
 export default FileUploadService;

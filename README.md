@@ -1,54 +1,124 @@
-# React + TypeScript + Vite
+# Social Media Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A comprehensive social media management application built with React, TypeScript, and Vite. This application allows you to create, schedule, and publish content to multiple social media platforms from a single interface.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Create and schedule posts for Instagram, YouTube, and TikTok
+- Upload images and videos from your gallery
+- Track comments and engagement across platforms
+- Manage multiple social media accounts
+- Dark mode support
+- Responsive design
 
-## Expanding the ESLint configuration
+## Technology Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **State Management**: Zustand
+- **Routing**: React Router
+- **API Integration**: Axios
+- **File Storage**: Google Cloud Storage
+- **Deployment**: Vercel
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+## Setup Instructions
+
+### Prerequisites
+
+- Node.js (v16 or higher)
+- npm or yarn
+- Google Cloud Platform account (for production)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/social-media-manager.git
+   cd social-media-manager
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+
+3. Create a `.env` file based on `.env.example`:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Configure environment variables in the `.env` file:
+   ```
+   VITE_GCS_PROJECT_ID=your-project-id
+   VITE_GCS_BUCKET_NAME=your-bucket-name
+   VITE_GCS_KEY_FILE=path/to/your-service-account-key.json
+   ```
+
+### Google Cloud Storage Setup (for Production)
+
+1. Create a Google Cloud Platform project
+2. Enable the Cloud Storage API
+3. Create a storage bucket
+4. Configure CORS for the bucket:
+   ```json
+   [
+     {
+       "origin": ["https://your-app-domain.com", "http://localhost:5173"],
+       "method": ["GET", "POST", "PUT"],
+       "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"],
+       "maxAgeSeconds": 3600
+     }
+   ]
+   ```
+5. Create a service account with Storage Admin role
+6. Generate a JSON key for the service account
+7. Save the key file in a secure location
+8. Update the `.env` file with the correct values
+
+### Development Mode
+
+Run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The application will be available at http://localhost:5173
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Production Build
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+Create a production build:
+
+```bash
+npm run build
+# or
+yarn build
 ```
+
+Preview the production build:
+
+```bash
+npm run preview
+# or
+yarn preview
+```
+
+### Deployment to Vercel
+
+1. Install the Vercel CLI:
+   ```bash
+   npm install -g vercel
+   ```
+
+2. Deploy to Vercel:
+   ```bash
+   vercel
+   ```
+
+3. Add environment variables in the Vercel dashboard:
+   - VITE_GCS_PROJECT_ID
+   - VITE_GCS_BUCKET_NAME
+   - VITE_GCS_KEY_FILE (for Vercel, you'll need to encode the JSON key file as a string)

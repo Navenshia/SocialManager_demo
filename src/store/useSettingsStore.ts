@@ -10,6 +10,7 @@ interface SettingsState {
 
   // API Credentials actions
   setInstagramCredentials: (accessToken: string) => void;
+  setFacebookCredentials: (accessToken: string) => void;
   setYoutubeCredentials: (apiKey: string, clientId: string, clientSecret: string, redirectUri: string, refreshToken?: string) => void;
   setTiktokCredentials: (baseUrl: string, accessToken: string) => void;
   clearCredentials: (platform: Platform) => void;
@@ -32,11 +33,13 @@ const useSettingsStore = create<SettingsState>()(
         instagram: false,
         youtube: false,
         tiktok: false,
+        facebook: false,
       },
       platformStats: {
         instagram: null,
         youtube: null,
         tiktok: null,
+        facebook: null,
       },
 
       setInstagramCredentials: (accessToken) => {
@@ -51,6 +54,22 @@ const useSettingsStore = create<SettingsState>()(
           platformsEnabled: {
             ...state.platformsEnabled,
             instagram: true,
+          },
+        }));
+      },
+
+      setFacebookCredentials: (accessToken) => {
+        const encryptedToken = encryptData(accessToken);
+        set((state) => ({
+          apiCredentials: {
+            ...state.apiCredentials,
+            facebook: {
+              accessToken: encryptedToken,
+            },
+          },
+          platformsEnabled: {
+            ...state.platformsEnabled,
+            facebook: true,
           },
         }));
       },
@@ -137,11 +156,13 @@ const useSettingsStore = create<SettingsState>()(
             instagram: false,
             youtube: false,
             tiktok: false,
+            facebook: false,
           },
           platformStats: {
             instagram: null,
             youtube: null,
             tiktok: null,
+            facebook: null,
           },
         });
       },

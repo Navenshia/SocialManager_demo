@@ -15,11 +15,13 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const isCloudinaryConfigured = true; // We've hardcoded the cloud name in cloudinaryStorage.ts
 
 export interface UploadResult {
-  publicUrl: string;
+  publicUrl: string;       // The URL to use for API calls (Facebook-compatible)
+  originalUrl?: string;    // The original URL before any modifications
   localPreviewUrl?: string; // Local preview URL for UI display
   fileType: 'image' | 'video';
   size: number;
   name: string;
+  isDataUrl?: boolean;     // Flag to indicate if this is a data URL
 }
 
 export class FileUploadService {
@@ -60,8 +62,21 @@ export class FileUploadService {
 
         console.log(`File uploaded to Cloudinary: ${publicUrl}`);
 
+        // Ensure the URL is Facebook-compatible
+        let facebookCompatibleUrl = publicUrl;
+
+        // For Facebook, ensure the URL has a proper image extension
+        if (fileType === 'image' && !publicUrl.match(/\.(jpg|jpeg|png|gif)$/i)) {
+          // Add the appropriate extension based on the file type
+          const extension = file.type === 'image/png' ? 'png' :
+                           file.type === 'image/gif' ? 'gif' : 'jpg';
+          facebookCompatibleUrl = `${publicUrl}.${extension}`;
+          console.log(`Added extension for Facebook compatibility: ${facebookCompatibleUrl}`);
+        }
+
         return {
-          publicUrl,
+          publicUrl: facebookCompatibleUrl, // Use the Facebook-compatible URL
+          originalUrl: publicUrl, // Keep the original URL for reference
           localPreviewUrl,
           fileType,
           size: file.size,
@@ -74,12 +89,17 @@ export class FileUploadService {
         // Fallback to data URL
         console.log('Falling back to data URL instead');
 
+        // For fallback, we'll use the data URL, but this won't work with Facebook
+        console.warn("Using data URL fallback - this won't work with Facebook");
+
         return {
           publicUrl: localPreviewUrl, // Use the data URL as the public URL
+          originalUrl: localPreviewUrl, // Same as publicUrl in this case
           localPreviewUrl,
           fileType,
           size: file.size,
-          name: file.name
+          name: file.name,
+          isDataUrl: true // Flag to indicate this is a data URL
         };
       }
     } catch (error) {

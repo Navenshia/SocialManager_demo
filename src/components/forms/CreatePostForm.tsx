@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Calendar as CalendarIcon, Clock, AlertTriangle, Instagram, Youtube, TrendingUp } from 'lucide-react';
+import { Calendar, Calendar as CalendarIcon, Clock, AlertTriangle, Instagram, Youtube, TrendingUp, Facebook } from 'lucide-react';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Toggle from '../ui/Toggle';
@@ -14,6 +14,7 @@ import ReactDatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { socialMediaCoordinator, apiFactory } from '../../api';
 import InstagramApiService from '../../api/InstagramApiService';
+import FacebookApiService from '../../api/FacebookApiService';
 import FileUploadService from '../../lib/fileUpload';
 
 interface CreatePostFormProps {
@@ -28,7 +29,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const [mediaType, setMediaType] = useState<'image' | 'video' | undefined>(undefined);
   const [publicMediaUrl, setPublicMediaUrl] = useState<string>('');
   const [usePublicUrl, setUsePublicUrl] = useState<boolean>(false);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['instagram', 'youtube', 'tiktok']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['instagram', 'youtube', 'tiktok', 'facebook']);
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
 
@@ -44,8 +45,11 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
 
   // Track user data
   const [username, setUsername] = useState<string | null>(null);
+  const [facebookPageName, setFacebookPageName] = useState<string | null>(null);
   const [isLoadingUsername, setIsLoadingUsername] = useState(false);
+  const [isLoadingFacebookPage, setIsLoadingFacebookPage] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [facebookPageError, setFacebookPageError] = useState<string | null>(null);
 
   // Access post store actions
   const createPost = usePostsStore(state => state.createPost);
@@ -53,7 +57,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const publishPost = usePostsStore(state => state.publishPost);
   const markAsFailed = usePostsStore(state => state.markAsFailed);
 
-  // Fetch username on component mount
+  // Fetch usernames on component mount
   useEffect(() => {
     const fetchInstagramUsername = async () => {
       if (apiCredentials.instagram && platformsEnabled.instagram) {
@@ -89,8 +93,43 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
       }
     };
 
+    const fetchFacebookPageName = async () => {
+      if (apiCredentials.facebook && platformsEnabled.facebook) {
+        try {
+          setIsLoadingFacebookPage(true);
+          setFacebookPageError(null);
+
+          // Use API service to get basic account info
+          const facebookApi = apiFactory.getApiService('facebook') as FacebookApiService;
+
+          // Fetch basic profile info directly
+          const profileInfo = await facebookApi.getBasicProfileInfo();
+
+          if (profileInfo && profileInfo.name) {
+            setFacebookPageName(profileInfo.name);
+            console.log("Facebook page name fetched:", profileInfo.name);
+          } else {
+            // If fetching failed or name is missing, use default
+            setFacebookPageName("Facebook Page");
+            setFacebookPageError('Could not retrieve your Facebook page name. Using default.');
+            console.warn("Failed to fetch Facebook page name or name missing in response.");
+          }
+        } catch (error) {
+          console.error('Error fetching Facebook page name:', error);
+          setFacebookPageError('Could not retrieve your Facebook page name. Please check your access token.');
+          setFacebookPageName("Facebook Page"); // Fallback on error
+        } finally {
+          setIsLoadingFacebookPage(false);
+        }
+      } else {
+        setFacebookPageName(null);
+        setFacebookPageError('Facebook is not connected. Please connect your account in Settings.');
+      }
+    };
+
     fetchInstagramUsername();
-  }, [apiCredentials.instagram, platformsEnabled.instagram]);
+    fetchFacebookPageName();
+  }, [apiCredentials.instagram, platformsEnabled.instagram, apiCredentials.facebook, platformsEnabled.facebook]);
 
   // Handle media file change
   const handleFileChange = async (file: File | null) => {
@@ -287,6 +326,12 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
         selectedPlatforms
       );
 
+      // Add the original file to the post for platforms that can use it directly
+      if (mediaFile) {
+        newPost.mediaFile = mediaFile;
+        console.log("Added original file to post for direct upload:", mediaFile.name);
+      }
+
       // If scheduled, update with schedule time
       if (isScheduled && scheduleDate) {
         schedulePost(newPost.id, scheduleDate);
@@ -354,15 +399,23 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
 
       // Show success message if there were no errors
       if (!error) {
+        // Create a success message based on selected platforms
+        const platformNames = selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ');
+
         // Add a success message
         if (usePublicUrl) {
-          alert("Post published successfully to Instagram with your caption and the provided public image URL! Check your Instagram account to see the post.");
+          alert(`Post published successfully to ${platformNames} with your caption and the provided public image URL! Check your accounts to see the post.`);
         } else if (mediaFile && mediaType === 'image') {
-          alert("Post published successfully to Instagram with your caption and your uploaded image! Check your Instagram account to see the post.");
+          alert(`Post published successfully to ${platformNames} with your caption and your uploaded image! Check your accounts to see the post.`);
         } else if (mediaFile && mediaType === 'video') {
-          alert("Post published successfully to Instagram with your caption and your uploaded video! Check your Instagram account to see the post.");
+          alert(`Post published successfully to ${platformNames} with your caption and your uploaded video! Check your accounts to see the post.`);
         } else {
-          alert("Post published successfully to Instagram! Check your Instagram account to see the post.");
+          alert(`Post published successfully to ${platformNames}! Check your accounts to see the post.`);
+        }
+
+        // Add a specific note about Facebook if it was selected
+        if (selectedPlatforms.includes('facebook') && mediaFile) {
+          alert("Your image has been directly uploaded to Facebook using our new direct upload feature. This should work much better than previous methods.");
         }
       }
 
@@ -383,21 +436,22 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     setMediaFile(null);
     setMediaUrl(undefined);
     setMediaType(undefined);
-    setSelectedPlatforms(['instagram', 'youtube', 'tiktok']);
+    setSelectedPlatforms(['instagram', 'youtube', 'tiktok', 'facebook']);
     setIsScheduled(false);
     setScheduleDate(null);
     setError(null);
     setUploadProgress(0);
   };
 
-  // Check if Instagram is properly connected
+  // Check if platforms are properly connected
   const isInstagramConnected = apiCredentials.instagram && platformsEnabled.instagram;
+  const isFacebookConnected = apiCredentials.facebook && platformsEnabled.facebook;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Platform Connection Status */}
       {selectedPlatforms.includes('instagram') && (
-        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-2">
           <div className="flex items-center">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 flex items-center justify-center mr-3">
               <Instagram size={16} className="text-white" />
@@ -422,6 +476,71 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               )}
               {usernameError && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">{usernameError}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedPlatforms.includes('facebook') && (
+        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center mr-3">
+              <Facebook size={16} className="text-white" />
+            </div>
+            <div className="flex-1">
+              {isFacebookConnected ? (
+                <div className="flex items-center">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {isLoadingFacebookPage ? 'Loading...' : facebookPageName || 'Facebook Page'}
+                  </span>
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    Connected
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Facebook</span>
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                    Not Connected
+                  </span>
+                </div>
+              )}
+              {facebookPageError && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">{facebookPageError}</p>
+              )}
+
+              {/* Facebook image posting info */}
+              {mediaFile && selectedPlatforms.includes('facebook') && (
+                <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                  <p className="font-medium">About Facebook image posting:</p>
+                  <p>We now use direct file uploads for Facebook, which should work much better than URL-based posting.</p>
+                  <p className="mt-1">How it works:</p>
+                  <ol className="list-decimal pl-4 mt-1">
+                    <li>Your image file is sent directly to Facebook's API</li>
+                    <li>This bypasses the need for publicly accessible URLs</li>
+                    <li>Your original image quality is preserved</li>
+                  </ol>
+                  <p className="mt-1">If you still encounter issues:</p>
+                  <ul className="list-disc pl-4 mt-1">
+                    <li>Try using a different image format (JPG works best)</li>
+                    <li>Make sure your image is less than 4MB in size</li>
+                    <li>Check the browser console for detailed error messages</li>
+                  </ul>
+                </div>
+              )}
+
+              {usePublicUrl && publicMediaUrl && selectedPlatforms.includes('facebook') && (
+                <div className="mt-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-2 rounded">
+                  <p className="font-medium">Using public URL for Facebook:</p>
+                  <p>Using a public URL is the recommended way to post images to Facebook.</p>
+                  <p className="mt-1">Recommended image URL formats:</p>
+                  <ul className="list-disc pl-4 mt-1">
+                    <li>https://i.imgur.com/example.jpg</li>
+                    <li>https://example.com/images/photo.png</li>
+                    <li>https://live.staticflickr.com/example.jpg</li>
+                  </ul>
+                </div>
               )}
             </div>
           </div>
@@ -665,6 +784,21 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               onChange={() => togglePlatform('tiktok')}
               color="blue"
               disabled={!platformsEnabled.tiktok}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center mr-3">
+                <span className="text-white text-xs">FB</span>
+              </div>
+              <span>Facebook {platformsEnabled.facebook ? '' : '(Not Connected)'}</span>
+            </div>
+            <Toggle
+              checked={selectedPlatforms.includes('facebook')}
+              onChange={() => togglePlatform('facebook')}
+              color="blue"
+              disabled={!platformsEnabled.facebook}
             />
           </div>
         </div>

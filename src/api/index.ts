@@ -1,6 +1,7 @@
 import InstagramApiService from './InstagramApiService';
 import YouTubeApiService from './YouTubeApiService';
 import TikTokApiService from './TikTokApiService';
+import FacebookApiService from './FacebookApiService';
 import useSettingsStore from '../store/useSettingsStore';
 import { Platform, Post } from '../types';
 
@@ -11,6 +12,7 @@ class SocialMediaApiFactory {
   private instagramApi: InstagramApiService | null = null;
   private youtubeApi: YouTubeApiService | null = null;
   private tiktokApi: TikTokApiService | null = null;
+  private facebookApi: FacebookApiService | null = null;
 
   /**
    * Get API service for a specific platform
@@ -18,11 +20,11 @@ class SocialMediaApiFactory {
   getApiService(platform: Platform) {
     const settings = useSettingsStore.getState();
     const isEnabled = settings.platformsEnabled[platform];
-    
+
     if (!isEnabled) {
       throw new Error(`Platform ${platform} is not enabled`);
     }
-    
+
     switch (platform) {
       case 'instagram':
         if (!this.instagramApi) {
@@ -34,7 +36,7 @@ class SocialMediaApiFactory {
           }
         }
         return this.instagramApi;
-        
+
       case 'youtube':
         if (!this.youtubeApi) {
           try {
@@ -45,7 +47,7 @@ class SocialMediaApiFactory {
           }
         }
         return this.youtubeApi;
-        
+
       case 'tiktok':
         if (!this.tiktokApi) {
           try {
@@ -56,12 +58,23 @@ class SocialMediaApiFactory {
           }
         }
         return this.tiktokApi;
-        
+
+      case 'facebook':
+        if (!this.facebookApi) {
+          try {
+            this.facebookApi = new FacebookApiService();
+          } catch (error) {
+            console.error('Failed to initialize Facebook API', error);
+            throw new Error('Facebook API is not properly configured');
+          }
+        }
+        return this.facebookApi;
+
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
   }
-  
+
   /**
    * Reset API services (e.g. after credentials change)
    */
@@ -75,6 +88,9 @@ class SocialMediaApiFactory {
         break;
       case 'tiktok':
         this.tiktokApi = null;
+        break;
+      case 'facebook':
+        this.facebookApi = null;
         break;
       default:
         throw new Error(`Unsupported platform: ${platform}`);
@@ -98,16 +114,17 @@ export class SocialMediaCoordinator {
       instagram: null,
       youtube: null,
       tiktok: null,
+      facebook: null,
     };
-    
+
     console.log("Publishing to platforms:", post.platforms);
-    
+
     try {
       // Process each platform sequentially to better catch and handle errors
       for (const platform of post.platforms) {
         try {
           console.log(`Attempting to publish to ${platform}...`);
-          
+
           switch (platform) {
             case 'instagram':
               if (post.mediaUrl && post.mediaType) {
@@ -119,7 +136,7 @@ export class SocialMediaCoordinator {
                 results[platform] = null;
               }
               break;
-              
+
             case 'youtube':
               if (post.mediaUrl && post.mediaType === 'video') {
                 const youtubeApi = apiFactory.getApiService('youtube') as YouTubeApiService;
@@ -130,7 +147,7 @@ export class SocialMediaCoordinator {
                 results[platform] = null;
               }
               break;
-              
+
             case 'tiktok':
               if (post.mediaUrl && post.mediaType === 'video') {
                 const tiktokApi = apiFactory.getApiService('tiktok') as TikTokApiService;
@@ -138,6 +155,26 @@ export class SocialMediaCoordinator {
                 console.log(`Successfully published to TikTok with ID: ${results[platform]}`);
               } else {
                 console.error("TikTok post requires video media");
+                results[platform] = null;
+              }
+              break;
+
+            case 'facebook':
+              try {
+                const facebookApi = apiFactory.getApiService('facebook') as FacebookApiService;
+
+                // If we have the original file, pass it to Facebook for direct upload
+                if (post.mediaFile && post.mediaType === 'image') {
+                  console.log("Using original file for Facebook upload:", post.mediaFile.name);
+                  results[platform] = await facebookApi.createPostWithFile(post.content, post.mediaFile);
+                } else {
+                  // Otherwise use the URL
+                  results[platform] = await facebookApi.createPost(post.content, post.mediaUrl, post.mediaType);
+                }
+
+                console.log(`Successfully published to Facebook with ID: ${results[platform]}`);
+              } catch (error) {
+                console.error("Error publishing to Facebook:", error);
                 results[platform] = null;
               }
               break;
@@ -150,11 +187,11 @@ export class SocialMediaCoordinator {
     } catch (error) {
       console.error("Error in publishToMultiplePlatforms:", error);
     }
-    
+
     console.log("Publishing results:", results);
     return results;
   }
-  
+
   /**
    * Fetch comments from all enabled platforms
    */
@@ -163,12 +200,12 @@ export class SocialMediaCoordinator {
     const enabledPlatforms = Object.entries(settings.platformsEnabled)
       .filter(([_, enabled]) => enabled)
       .map(([platform]) => platform as Platform);
-      
+
     // Implementation would depend on how posts are stored and tracked
     // This is a placeholder for the actual implementation
     console.log('Fetching comments from platforms:', enabledPlatforms);
   }
-  
+
   /**
    * Get statistics from all enabled platforms
    */
@@ -177,9 +214,9 @@ export class SocialMediaCoordinator {
     const enabledPlatforms = Object.entries(settings.platformsEnabled)
       .filter(([_, enabled]) => enabled)
       .map(([platform]) => platform as Platform);
-    
+
     const results = {};
-    
+
     for (const platform of enabledPlatforms) {
       try {
         const api = apiFactory.getApiService(platform);
@@ -191,7 +228,7 @@ export class SocialMediaCoordinator {
         console.error(`Error getting stats for ${platform}:`, error);
       }
     }
-    
+
     return settings.platformStats;
   }
 }

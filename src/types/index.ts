@@ -1,5 +1,5 @@
 // Platform types
-export type Platform = 'instagram' | 'youtube' | 'tiktok';
+export type Platform = 'instagram' | 'youtube' | 'tiktok' | 'facebook';
 
 // Social media post type
 export interface Post {
@@ -7,6 +7,7 @@ export interface Post {
   content: string; // Caption/text content
   mediaUrl?: string; // URL to image or video
   mediaType?: 'image' | 'video';
+  mediaFile?: File; // Original file object (if available)
   platforms: Platform[];
   scheduledFor: Date | null; // null means publish immediately
   publishedAt?: Date;
@@ -51,6 +52,9 @@ export interface ApiCredentials {
   };
   tiktok?: {
     baseUrl: string;
+    accessToken: string;
+  };
+  facebook?: {
     accessToken: string;
   };
 }

@@ -42,8 +42,17 @@ export class CloudinaryService {
       formData.append('timestamp', timestamp.toString());
 
       // Add a unique public_id to prevent collisions
-      const publicId = `${folder}/${uuidv4()}`;
+      // Use a simpler format without slashes for better compatibility
+      const uniqueId = uuidv4().substring(0, 8);
+      const publicId = `${folder}_${uniqueId}`;
       formData.append('public_id', publicId);
+
+      // Add delivery type for better Facebook compatibility
+      formData.append('delivery_type', 'upload');
+
+      // Set resource type based on file type
+      const resourceType = file.type.startsWith('image/') ? 'image' : 'video';
+      formData.append('resource_type', resourceType);
 
       // Generate a signature
       // In a production app, this should be done server-side
@@ -73,9 +82,33 @@ export class CloudinaryService {
         formData
       );
 
-      // Return the secure URL of the uploaded file
-      const publicUrl = response.data.secure_url;
-      console.log(`File uploaded successfully to Cloudinary: ${publicUrl}`);
+      // Get the response data
+      const responseData = response.data;
+      console.log("Cloudinary upload response:", responseData);
+
+      // Get the secure URL of the uploaded file
+      let publicUrl = responseData.secure_url;
+
+      // For Facebook compatibility, ensure the URL is direct and has no transformations
+      if (publicUrl.includes('/upload/')) {
+        // Extract the base URL and public ID
+        const parts = publicUrl.split('/upload/');
+        if (parts.length === 2) {
+          // Create a direct URL to the original image without transformations
+          publicUrl = `${parts[0]}/upload/${parts[1]}`;
+        }
+      }
+
+      // Store additional information for debugging
+      const urlInfo = {
+        originalUrl: responseData.secure_url,
+        modifiedUrl: publicUrl,
+        publicId: responseData.public_id,
+        format: responseData.format,
+        resourceType: responseData.resource_type
+      };
+
+      console.log(`File uploaded successfully to Cloudinary:`, urlInfo);
 
       return publicUrl;
     } catch (error) {

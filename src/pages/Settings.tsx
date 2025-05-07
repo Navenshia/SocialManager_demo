@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Instagram, Youtube, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
+import { Instagram, Youtube, TrendingUp, CheckCircle, AlertCircle, Facebook } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -14,6 +14,7 @@ const Settings: React.FC = () => {
     apiCredentials,
     platformsEnabled,
     setInstagramCredentials,
+    setFacebookCredentials,
     setYoutubeCredentials,
     setTiktokCredentials,
     clearCredentials,
@@ -22,6 +23,7 @@ const Settings: React.FC = () => {
 
   // Form states
   const [instagramToken, setInstagramToken] = useState('');
+  const [facebookToken, setFacebookToken] = useState('');
   const [youtubeApiKey, setYoutubeApiKey] = useState('');
   const [youtubeClientId, setYoutubeClientId] = useState('');
   const [youtubeClientSecret, setYoutubeClientSecret] = useState('');
@@ -33,11 +35,13 @@ const Settings: React.FC = () => {
   const [savingPlatform, setSavingPlatform] = useState<Platform | null>(null);
   const [errors, setErrors] = useState<{
     instagram?: string;
+    facebook?: string;
     youtube?: string;
     tiktok?: string;
   }>({});
   const [successMessages, setSuccessMessages] = useState<{
     instagram?: string;
+    facebook?: string;
     youtube?: string;
     tiktok?: string;
   }>({});
@@ -58,16 +62,68 @@ const Settings: React.FC = () => {
 
       // Save the credentials
       setInstagramCredentials(instagramToken);
-      
+
       // Reset API service to use new credentials
       apiFactory.resetApiService('instagram');
-      
+
       // Show success message
       setSuccessMessages(prev => ({ ...prev, instagram: 'Instagram credentials saved successfully' }));
       setInstagramToken('');
     } catch (error: any) {
       console.error('Error saving Instagram credentials:', error);
       setErrors(prev => ({ ...prev, instagram: 'Failed to save Instagram credentials. Please check your access token and try again.' }));
+    } finally {
+      setSavingPlatform(null);
+    }
+  };
+
+  // Handle Facebook form submission
+  const handleFacebookSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingPlatform('facebook');
+    setErrors({});
+    setSuccessMessages({});
+
+    try {
+      if (!facebookToken) {
+        setErrors(prev => ({ ...prev, facebook: 'Access Token is required' }));
+        setSavingPlatform(null);
+        return;
+      }
+
+      console.log("Saving Facebook token (first 10 chars):", facebookToken.substring(0, 10) + "...");
+
+      // Save the credentials
+      setFacebookCredentials(facebookToken);
+
+      // Reset API service to use new credentials
+      apiFactory.resetApiService('facebook');
+
+      // Show success message
+      setSuccessMessages(prev => ({ ...prev, facebook: 'Facebook credentials saved successfully' }));
+      setFacebookToken('');
+
+      // Verify the token works by testing the API
+      setTimeout(async () => {
+        try {
+          const facebookApi = apiFactory.getApiService('facebook');
+          const profileInfo = await facebookApi.getBasicProfileInfo();
+          console.log("Facebook profile verification successful:", profileInfo);
+          setSuccessMessages(prev => ({
+            ...prev,
+            facebook: `Facebook credentials saved successfully. Connected to: ${profileInfo.name}`
+          }));
+        } catch (verifyError) {
+          console.error("Error verifying Facebook token:", verifyError);
+          setErrors(prev => ({
+            ...prev,
+            facebook: 'Token saved but verification failed. The token may be invalid or expired.'
+          }));
+        }
+      }, 1000);
+    } catch (error: any) {
+      console.error('Error saving Facebook credentials:', error);
+      setErrors(prev => ({ ...prev, facebook: 'Failed to save Facebook credentials. Please check your access token and try again.' }));
     } finally {
       setSavingPlatform(null);
     }
@@ -94,13 +150,13 @@ const Settings: React.FC = () => {
         youtubeClientSecret,
         youtubeRedirectUri
       );
-      
+
       // Reset API service to use new credentials
       apiFactory.resetApiService('youtube');
-      
+
       // Show success message
       setSuccessMessages(prev => ({ ...prev, youtube: 'YouTube credentials saved successfully' }));
-      
+
       // Clear form
       setYoutubeApiKey('');
       setYoutubeClientId('');
@@ -128,10 +184,10 @@ const Settings: React.FC = () => {
 
       // Save the credentials
       setTiktokCredentials(tiktokBaseUrl, tiktokToken);
-      
+
       // Reset API service to use new credentials
       apiFactory.resetApiService('tiktok');
-      
+
       // Show success message
       setSuccessMessages(prev => ({ ...prev, tiktok: 'TikTok credentials saved successfully' }));
       setTiktokToken('');
@@ -177,9 +233,9 @@ const Settings: React.FC = () => {
                 </p>
               </div>
             </div>
-            
-            <Toggle 
-              checked={platformsEnabled.instagram} 
+
+            <Toggle
+              checked={platformsEnabled.instagram}
               onChange={(checked) => togglePlatform('instagram', checked)}
               disabled={!apiCredentials.instagram}
               color="pink"
@@ -208,13 +264,13 @@ const Settings: React.FC = () => {
                 placeholder="Enter your Instagram access token"
                 type="password"
               />
-              
+
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 You can get your access token from the Meta Developer Portal.
-                <a 
+                <a
                   href="https://developers.facebook.com/docs/instagram-api/getting-started"
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="ml-1 text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   Learn more
@@ -245,6 +301,92 @@ const Settings: React.FC = () => {
           )}
         </Card>
 
+        {/* Facebook Settings */}
+        <Card
+          title="Facebook"
+          icon={<Facebook className="text-blue-600" />}
+          className="border-l-4 border-blue-600"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mr-4">
+                <Facebook size={20} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium">Facebook</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {apiCredentials.facebook ? 'Connected' : 'Not connected'}
+                </p>
+              </div>
+            </div>
+
+            <Toggle
+              checked={platformsEnabled.facebook}
+              onChange={(checked) => togglePlatform('facebook', checked)}
+              disabled={!apiCredentials.facebook}
+              color="blue"
+            />
+          </div>
+
+          {apiCredentials.facebook ? (
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Your Facebook account is connected. You can disconnect at any time.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => handleClearCredentials('facebook')}
+                size="sm"
+              >
+                Disconnect Account
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleFacebookSubmit} className="space-y-4">
+              <Input
+                label="Access Token"
+                value={facebookToken}
+                onChange={(e) => setFacebookToken(e.target.value)}
+                placeholder="Enter your Facebook access token"
+                type="password"
+              />
+
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                You can get your access token from the Meta Developer Portal.
+                <a
+                  href="https://developers.facebook.com/docs/facebook-login/guides/access-tokens"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Learn more
+                </a>
+              </p>
+
+              {errors.facebook && (
+                <div className="flex items-center text-red-600 dark:text-red-400 text-sm">
+                  <AlertCircle size={16} className="mr-1" />
+                  {errors.facebook}
+                </div>
+              )}
+
+              {successMessages.facebook && (
+                <div className="flex items-center text-green-600 dark:text-green-400 text-sm">
+                  <CheckCircle size={16} className="mr-1" />
+                  {successMessages.facebook}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={savingPlatform === 'facebook'}
+              >
+                {savingPlatform === 'facebook' ? 'Saving...' : 'Save Credentials'}
+              </Button>
+            </form>
+          )}
+        </Card>
+
         {/* YouTube Settings */}
         <Card
           title="YouTube"
@@ -263,9 +405,9 @@ const Settings: React.FC = () => {
                 </p>
               </div>
             </div>
-            
-            <Toggle 
-              checked={platformsEnabled.youtube} 
+
+            <Toggle
+              checked={platformsEnabled.youtube}
               onChange={(checked) => togglePlatform('youtube', checked)}
               disabled={!apiCredentials.youtube}
               color="red"
@@ -317,13 +459,13 @@ const Settings: React.FC = () => {
                 onChange={(e) => setYoutubeRedirectUri(e.target.value)}
                 placeholder="Enter your OAuth redirect URI"
               />
-              
+
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 You can get these credentials from the Google Cloud Console.
-                <a 
+                <a
                   href="https://developers.google.com/youtube/v3/getting-started"
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="ml-1 text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   Learn more
@@ -372,9 +514,9 @@ const Settings: React.FC = () => {
                 </p>
               </div>
             </div>
-            
-            <Toggle 
-              checked={platformsEnabled.tiktok} 
+
+            <Toggle
+              checked={platformsEnabled.tiktok}
               onChange={(checked) => togglePlatform('tiktok', checked)}
               disabled={!apiCredentials.tiktok}
             />
@@ -401,7 +543,7 @@ const Settings: React.FC = () => {
                 onChange={(e) => setTiktokBaseUrl(e.target.value)}
                 placeholder="https://open-api.tiktok.com/v2"
               />
-              
+
               <Input
                 label="Access Token"
                 value={tiktokToken}
@@ -409,13 +551,13 @@ const Settings: React.FC = () => {
                 placeholder="Enter your TikTok access token"
                 type="password"
               />
-              
+
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 You can get your access token from the TikTok Developer Portal.
-                <a 
+                <a
                   href="https://developers.tiktok.com/doc/login-kit-web"
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="ml-1 text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   Learn more
@@ -455,7 +597,7 @@ const Settings: React.FC = () => {
                 You can change the theme from the toggle in the top bar
               </p>
             </div>
-            
+
             <div>
               <h3 className="font-medium mb-2">About</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">

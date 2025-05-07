@@ -405,6 +405,83 @@ const CommentsPage: React.FC = () => {
     }
   }, [posts]);
 
+  // Function to import real Facebook posts into the posts store
+  const importRealFacebookPosts = useCallback(async () => {
+    try {
+      // Check if Facebook platform is enabled
+      if (!platformsEnabled.facebook) {
+        console.log("Facebook platform is not enabled. Skipping Facebook posts import.");
+        return;
+      }
+
+      // Get the Facebook API service
+      const FacebookApiService = (await import('../api/FacebookApiService')).default;
+      const facebookApi = apiFactory.getApiService('facebook') as InstanceType<typeof FacebookApiService>;
+
+      // Fetch posts from Facebook
+      const postsResponse = await facebookApi.getPosts(5); // Limit to 5 posts to reduce duplicates
+      const fbPosts = postsResponse.data || [];
+      console.log(`Fetched ${fbPosts.length} posts from Facebook`);
+
+      if (fbPosts.length > 0) {
+        // Get the posts store
+        const postsStore = usePostsStore.getState();
+
+        // Get existing Facebook post IDs to prevent duplicates
+        const existingFacebookIds = new Set(
+          posts
+            .filter(post => post.platformPostIds?.facebook)
+            .map(post => post.platformPostIds?.facebook)
+        );
+
+        console.log(`Found ${existingFacebookIds.size} existing Facebook posts in store`);
+
+        // Count how many posts we'll import
+        const newPosts = fbPosts.filter(post => !existingFacebookIds.has(post.id));
+        console.log(`Found ${newPosts.length} new Facebook posts to import`);
+
+        // If we already have all the posts, no need to import
+        if (newPosts.length === 0) {
+          console.log("All Facebook posts are already in the store, no need to import");
+          return;
+        }
+
+        // Import each new post
+        let importCount = 0;
+        for (const post of newPosts) {
+          // Skip if we already have this post
+          if (existingFacebookIds.has(post.id)) {
+            console.log(`Skipping existing Facebook post ${post.id}`);
+            continue;
+          }
+
+          // Create a new post in the store
+          const newPost = postsStore.createPost(
+            post.message || 'Facebook post',
+            post.permalink_url || '',
+            'image', // Default to image type
+            ['facebook']
+          );
+
+          // Mark it as published with the real Facebook post ID
+          postsStore.publishPost(newPost.id, {
+            facebook: post.id,
+            instagram: '',
+            youtube: '',
+            tiktok: ''
+          });
+
+          console.log(`Imported Facebook post ${post.id} into posts store`);
+          importCount++;
+        }
+
+        console.log(`Successfully imported ${importCount} new Facebook posts`);
+      }
+    } catch (error) {
+      console.error("Error importing Facebook posts:", error);
+    }
+  }, [posts, platformsEnabled.facebook]);
+
   // Track if we've already imported posts to prevent duplicate imports
   const [postsImported, setPostsImported] = useState(false);
 

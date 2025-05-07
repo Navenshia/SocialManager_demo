@@ -590,6 +590,58 @@ const CommentsPage: React.FC = () => {
           }
           break;
         }
+        case 'facebook': {
+          try {
+            console.log(`Replying to Facebook comment: ${comment.id}`);
+            
+            // Check if Facebook is enabled
+            if (!platformsEnabled.facebook) {
+              throw new Error('Facebook platform is not enabled');
+            }
+            
+            // Import the specific service type to use its methods
+            const FacebookApiService = (await import('../api/FacebookApiService')).default;
+            const facebookApi = apiFactory.getApiService('facebook') as InstanceType<typeof FacebookApiService>;
+            
+            // Check if this is a simulated comment
+            const isSimulatedComment = comment.id.includes('facebook_comment_');
+            
+            if (isSimulatedComment) {
+              console.error('Cannot reply to simulated comments');
+              alert('This appears to be a demo comment. To reply to real Facebook comments, please connect your Facebook account.');
+              return;
+            }
+            
+            // Get the platform comment ID (remove the fb_ prefix if present)
+            const platformCommentId = comment.platformCommentId.startsWith('fb_') 
+              ? comment.platformCommentId.substring(3) 
+              : comment.platformCommentId;
+            
+            // Reply to the comment
+            await facebookApi.replyToComment(comment.platformPostId, reply, platformCommentId);
+            console.log(`Reply posted successfully to Facebook comment ID: ${platformCommentId}`);
+            
+            // Mark as replied in our store
+            markAsReplied(comment.id);
+            
+            // Clear the reply text
+            setReplyText({
+              ...replyText,
+              [comment.id]: ''
+            });
+          } catch (error) {
+            console.error('Error replying to Facebook comment:', error);
+            
+            // Check if the error is related to platform not being enabled
+            if (error instanceof Error && error.message.includes('not enabled')) {
+              alert('Facebook platform is not enabled. Please enable it in Settings.');
+            } else {
+              alert('Error replying to comment: ' + (error instanceof Error ? error.message : 'Unknown error'));
+            }
+            return;
+          }
+          break;
+        }
         // TODO: Add cases for YouTube and TikTok
         default:
           console.warn(`Replying to comments on ${comment.platform} is not yet supported.`);

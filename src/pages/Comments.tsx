@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import useCommentsStore from '../store/useCommentsStore';
 import usePostsStore from '../store/usePostsStore';
 import useSettingsStore from '../store/useSettingsStore';
-import { Search, ThumbsUp, MessageCircle, Flag, Trash2, RefreshCw, Camera, Video, TrendingUp, Filter } from 'lucide-react';
+import { Search, ThumbsUp, MessageCircle, Flag, Trash2, RefreshCw, Camera, Video, TrendingUp, Filter, Facebook } from 'lucide-react';
 import { Platform, Comment } from '../types';
 import { format } from 'date-fns';
 import { apiFactory, socialMediaCoordinator } from '../api';
@@ -275,14 +275,15 @@ const CommentsPage: React.FC = () => {
 
         // Process all fetched comments and keep only unique ones
         allFetchedComments.forEach(comment => {
-          // Create a unique key based on content and platform
-          const key = `${comment.platform}_${comment.content}`;
+          // Create a unique key based on content, platform, and platformPostId
+          // This ensures we don't deduplicate across different platforms or posts
+          const key = `${comment.platform}_${comment.platformPostId}_${comment.content}`;
 
           // Only add if we haven't seen this comment before
           if (!uniqueComments.has(key)) {
             uniqueComments.set(key, comment);
           } else {
-            console.log(`Skipping duplicate comment: ${comment.content.substring(0, 20)}...`);
+            console.log(`Skipping duplicate comment: ${comment.platform} - ${comment.content.substring(0, 20)}...`);
           }
         });
 
@@ -593,37 +594,37 @@ const CommentsPage: React.FC = () => {
         case 'facebook': {
           try {
             console.log(`Replying to Facebook comment: ${comment.id}`);
-            
+
             // Check if Facebook is enabled
             if (!platformsEnabled.facebook) {
               throw new Error('Facebook platform is not enabled');
             }
-            
+
             // Import the specific service type to use its methods
             const FacebookApiService = (await import('../api/FacebookApiService')).default;
             const facebookApi = apiFactory.getApiService('facebook') as InstanceType<typeof FacebookApiService>;
-            
+
             // Check if this is a simulated comment
             const isSimulatedComment = comment.id.includes('facebook_comment_');
-            
+
             if (isSimulatedComment) {
               console.error('Cannot reply to simulated comments');
               alert('This appears to be a demo comment. To reply to real Facebook comments, please connect your Facebook account.');
               return;
             }
-            
+
             // Get the platform comment ID (remove the fb_ prefix if present)
-            const platformCommentId = comment.platformCommentId.startsWith('fb_') 
-              ? comment.platformCommentId.substring(3) 
+            const platformCommentId = comment.platformCommentId.startsWith('fb_')
+              ? comment.platformCommentId.substring(3)
               : comment.platformCommentId;
-            
+
             // Reply to the comment
             await facebookApi.replyToComment(comment.platformPostId, reply, platformCommentId);
             console.log(`Reply posted successfully to Facebook comment ID: ${platformCommentId}`);
-            
+
             // Mark as replied in our store
             markAsReplied(comment.id);
-            
+
             // Clear the reply text
             setReplyText({
               ...replyText,
@@ -631,7 +632,7 @@ const CommentsPage: React.FC = () => {
             });
           } catch (error) {
             console.error('Error replying to Facebook comment:', error);
-            
+
             // Check if the error is related to platform not being enabled
             if (error instanceof Error && error.message.includes('not enabled')) {
               alert('Facebook platform is not enabled. Please enable it in Settings.');
@@ -671,6 +672,8 @@ const CommentsPage: React.FC = () => {
     switch (platform) {
       case 'instagram':
         return <Camera size={16} className="text-pink-600" />;
+      case 'facebook':
+        return <Facebook size={16} className="text-blue-600" />;
       case 'youtube':
         return <Video size={16} className="text-red-600" />;
       case 'tiktok':
@@ -733,14 +736,15 @@ const CommentsPage: React.FC = () => {
 
                   // Process all comments and keep only unique ones
                   comments.forEach(comment => {
-                    // Create a unique key based on content and platform
-                    const key = `${comment.platform}_${comment.content}`;
+                    // Create a unique key based on content, platform, and platformPostId
+                    // This ensures we don't deduplicate across different platforms or posts
+                    const key = `${comment.platform}_${comment.platformPostId}_${comment.content}`;
 
                     // Only add if we haven't seen this comment before
                     if (!uniqueComments.has(key)) {
                       uniqueComments.set(key, comment);
                     } else {
-                      console.log(`Skipping duplicate comment: ${comment.content.substring(0, 20)}...`);
+                      console.log(`Skipping duplicate comment: ${comment.platform} - ${comment.content.substring(0, 20)}...`);
                     }
                   });
 
@@ -862,6 +866,13 @@ const CommentsPage: React.FC = () => {
             >
               <Camera size={16} />
               <span>Instagram</span>
+            </button>
+            <button
+              className={`p-2 rounded-lg flex items-center space-x-1 ${selectedPlatform === 'facebook' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-200' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}
+              onClick={() => setSelectedPlatform('facebook')}
+            >
+              <Facebook size={16} />
+              <span>Facebook</span>
             </button>
             <button
               className={`p-2 rounded-lg flex items-center space-x-1 ${selectedPlatform === 'youtube' ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-200' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}
@@ -1012,7 +1023,7 @@ const CommentsPage: React.FC = () => {
                     <div className="mt-4">
                       <div className="flex flex-col">
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                          <span className="font-medium">Note:</span> Your reply will be posted as a threaded reply directly under this comment on Instagram using the comment's /replies endpoint.
+                          <span className="font-medium">Note:</span> Your reply will be posted as a threaded reply directly under this comment on {comment.platform === 'facebook' ? 'Facebook' : 'Instagram'} using the comment's /replies endpoint.
                         </div>
                         <div className="flex">
                           <input
@@ -1034,7 +1045,7 @@ const CommentsPage: React.FC = () => {
                   ) : (
                     <div className="mt-3 text-sm text-green-600 dark:text-green-400 flex items-center">
                       <MessageCircle size={14} className="mr-1" />
-                      Replied as threaded comment using /replies endpoint
+                      Replied as threaded comment on {comment.platform === 'facebook' ? 'Facebook' : 'Instagram'}
                     </div>
                   )}
                 </div>
